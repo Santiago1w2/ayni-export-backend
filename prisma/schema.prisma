@@ -1,0 +1,304 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  EXPORTER
+  IMPORTER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  MANUAL_REVIEW
+  REJECTED
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  ACCEPTED
+  REJECTED
+  NEGOTIATING
+  AGREEMENT_REACHED
+  COMPLETED
+  CANCELLED
+}
+
+enum RequirementFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  SELECT
+  BOOLEAN
+  FILE
+}
+
+enum DocumentReviewStatus {
+  PENDING
+  APPROVED
+  WARNING
+  MANUAL_REVIEW
+}
+
+enum AgreementStatus {
+  DRAFT
+  CONFIRMED
+  COMPLETED
+}
+
+enum OfferStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+model User {
+  id              String                 @id @default(uuid()) @db.Uuid
+  email           String                 @unique
+  passwordHash    String
+  role            UserRole
+  isActive        Boolean                @default(true)
+  company         Company?
+  statusActions   RequestStatusHistory[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+}
+
+model Company {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  ownerUserId        String                 @unique @db.Uuid
+  owner              User                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  legalName          String
+  tradeName          String?
+  countryCode        String
+  taxId              String
+  website            String?
+  phone              String?
+  contactEmail       String
+  description        String?
+  logoUrl            String?
+  verificationStatus VerificationStatus     @default(PENDING)
+  verifiedAt         DateTime?
+  verificationSource String?
+  verificationNotes  String?
+  verifications      CompanyVerification[]
+  buyingInterests    BuyingInterest[]
+  requirementForms   RequirementForm[]
+  exportOffers       ExportOffer[]
+  receivedRequests   ExportRequest[]         @relation("ImporterRequests")
+  uploadedDocuments  DocumentSubmission[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@unique([countryCode, taxId])
+  @@index([verificationStatus])
+}
+
+model CompanyVerification {
+  id        String             @id @default(uuid()) @db.Uuid
+  companyId String             @db.Uuid
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type      String
+  status    VerificationStatus
+  source    String
+  result    Json?
+  createdAt DateTime           @default(now())
+}
+
+model BuyingInterest {
+  id                         String            @id @default(uuid()) @db.Uuid
+  importerCompanyId          String            @db.Uuid
+  importerCompany            Company           @relation(fields: [importerCompanyId], references: [id], onDelete: Cascade)
+  productName                String
+  category                   String?
+  description                String?
+  minQuantityTons            Float
+  maxQuantityTons            Float?
+  minTargetPrice             Float?
+  maxTargetPrice             Float?
+  currency                   String
+  preferredOriginCountries   String[]
+  requiredCertifications     String[]
+  active                     Boolean           @default(true)
+  requirementForms           RequirementForm[]
+  exportRequests             ExportRequest[]
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  @@index([productName, active])
+}
+
+model RequirementForm {
+  id                  String                @id @default(uuid()) @db.Uuid
+  importerCompanyId   String                @db.Uuid
+  importerCompany     Company               @relation(fields: [importerCompanyId], references: [id], onDelete: Cascade)
+  buyingInterestId    String?               @db.Uuid
+  buyingInterest      BuyingInterest?       @relation(fields: [buyingInterestId], references: [id], onDelete: SetNull)
+  title               String
+  description         String?
+  active              Boolean               @default(true)
+  fields              RequirementField[]
+  documentRequirements DocumentRequirement[]
+  exportRequests      ExportRequest[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+}
+
+model RequirementField {
+  id        String               @id @default(uuid()) @db.Uuid
+  formId    String               @db.Uuid
+  form      RequirementForm      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  label     String
+  type      RequirementFieldType
+  required  Boolean              @default(false)
+  helpText  String?
+  options   Json?
+  order     Int                  @default(0)
+  responses RequestFieldResponse[]
+}
+
+model DocumentRequirement {
+  id                String               @id @default(uuid()) @db.Uuid
+  formId            String               @db.Uuid
+  form              RequirementForm      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  required          Boolean              @default(true)
+  instructionsForAI String?
+  templateUrl       String?
+  order             Int                  @default(0)
+  submissions       DocumentSubmission[]
+}
+
+model ExportOffer {
+  id                 String          @id @default(uuid()) @db.Uuid
+  exporterCompanyId  String          @db.Uuid
+  exporterCompany    Company         @relation(fields: [exporterCompanyId], references: [id], onDelete: Cascade)
+  productName        String
+  category           String?
+  description        String?
+  quantityTons       Float
+  pricePerKg         Float
+  currency           String
+  certifications     String[]
+  preferredRegion    String?
+  preferredCountries String[]
+  availabilityDate   DateTime?
+  status             OfferStatus     @default(ACTIVE)
+  exportRequests     ExportRequest[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([productName, status])
+}
+
+model ExportRequest {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  offerId               String                  @db.Uuid
+  offer                 ExportOffer             @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  importerCompanyId     String                  @db.Uuid
+  importerCompany       Company                 @relation("ImporterRequests", fields: [importerCompanyId], references: [id], onDelete: Restrict)
+  buyingInterestId      String?                 @db.Uuid
+  buyingInterest        BuyingInterest?         @relation(fields: [buyingInterestId], references: [id], onDelete: SetNull)
+  requirementFormId     String?                 @db.Uuid
+  requirementForm       RequirementForm?        @relation(fields: [requirementFormId], references: [id], onDelete: SetNull)
+  status                RequestStatus            @default(DRAFT)
+  matchScoreSnapshot    Int?
+  matchFeedbackSnapshot Json?
+  submittedAt           DateTime?
+  acceptedAt            DateTime?
+  rejectedAt            DateTime?
+  completedAt           DateTime?
+  responses             RequestFieldResponse[]
+  documents             DocumentSubmission[]
+  statusHistory         RequestStatusHistory[]
+  agreement             Agreement?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([importerCompanyId, status])
+  @@index([offerId])
+}
+
+model RequestStatusHistory {
+  id          String        @id @default(uuid()) @db.Uuid
+  requestId   String        @db.Uuid
+  request     ExportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fromStatus  RequestStatus?
+  toStatus    RequestStatus
+  actorUserId String        @db.Uuid
+  actor       User          @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  note        String?
+  createdAt   DateTime      @default(now())
+}
+
+model RequestFieldResponse {
+  id        String           @id @default(uuid()) @db.Uuid
+  requestId String           @db.Uuid
+  request   ExportRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fieldId   String           @db.Uuid
+  field     RequirementField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value     Json
+
+  @@unique([requestId, fieldId])
+}
+
+model DocumentSubmission {
+  id                    String               @id @default(uuid()) @db.Uuid
+  requestId             String               @db.Uuid
+  request               ExportRequest        @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  documentRequirementId String?              @db.Uuid
+  documentRequirement   DocumentRequirement? @relation(fields: [documentRequirementId], references: [id], onDelete: SetNull)
+  uploaderCompanyId     String               @db.Uuid
+  uploaderCompany       Company              @relation(fields: [uploaderCompanyId], references: [id], onDelete: Restrict)
+  fileName              String
+  storagePath           String
+  mimeType              String
+  fileSize              Int
+  analysis              DocumentAnalysis?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+}
+
+model DocumentAnalysis {
+  id              String               @id @default(uuid()) @db.Uuid
+  submissionId    String               @unique @db.Uuid
+  submission      DocumentSubmission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  provider        String
+  documentType    String
+  status          DocumentReviewStatus
+  confidence      Float
+  summary         String
+  issues          Json
+  recommendations Json
+  createdAt       DateTime             @default(now())
+}
+
+model Agreement {
+  id                    String          @id @default(uuid()) @db.Uuid
+  requestId             String          @unique @db.Uuid
+  request               ExportRequest   @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  agreementCode         String          @unique
+  finalQuantityTons     Float
+  pricePerKg            Float
+  currency              String
+  incoterm              String
+  destination           String
+  estimatedDelivery     DateTime?
+  notes                 String?
+  estimatedTradeValue   Float
+  status                AgreementStatus @default(CONFIRMED)
+  agreementPdfPath      String?
+  completionPdfPath     String?
+  completedAt           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}

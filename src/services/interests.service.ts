@@ -1,0 +1,7 @@
+import { prisma } from "../config/prisma";import { AppError } from "../utils/errors";import { myCompany } from "./companies.service";
+export type InterestInput={productName:string;category?:string;description?:string;minQuantityTons:number;maxQuantityTons?:number;minTargetPrice?:number;maxTargetPrice?:number;currency:string;preferredOriginCountries:string[];requiredCertifications:string[];active?:boolean};
+export async function createInterest(uid:string,data:InterestInput){const c=await myCompany(uid);return prisma.buyingInterest.create({data:{...data,importerCompanyId:c.id}})}
+export async function mine(uid:string){const c=await myCompany(uid);return prisma.buyingInterest.findMany({where:{importerCompanyId:c.id},orderBy:{createdAt:"desc"}})}
+export async function one(id:string){const x=await prisma.buyingInterest.findUnique({where:{id},include:{importerCompany:{select:{id:true,legalName:true,countryCode:true,verificationStatus:true}}}});if(!x)throw new AppError("interest not found",404);return x}
+async function owned(uid:string,id:string){const c=await myCompany(uid),x=await prisma.buyingInterest.findFirst({where:{id,importerCompanyId:c.id}});if(!x)throw new AppError("interest not found",404);return x}
+export async function update(uid:string,id:string,data:Partial<InterestInput>){await owned(uid,id);return prisma.buyingInterest.update({where:{id},data})} export async function remove(uid:string,id:string){await owned(uid,id);await prisma.buyingInterest.delete({where:{id}})}
