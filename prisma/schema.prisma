@@ -93,7 +93,6 @@ model Company {
   tradeName          String?
   countryCode        String
   taxId              String
-  website            String?
   phone              String?
   contactEmail       String
   description        String?

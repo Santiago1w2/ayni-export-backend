@@ -453,7 +453,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"legalName\": \"Ayni Postman Exporter SAC\",\n  \"tradeName\": \"Ayni Postman Exporter\",\n  \"countryCode\": \"PE\",\n  \"taxId\": \"POSTMAN-RUC-001\",\n  \"contactEmail\": \"{{exporterEmail}}\",\n  \"phone\": \"+51999999999\",\n  \"website\": \"https://example.com\",\n  \"description\": \"Empresa ficticia para pruebas Postman.\"\n}",
+              "raw": "{\n  \"legalName\": \"Ayni Postman Exporter SAC\",\n  \"tradeName\": \"Ayni Postman Exporter\",\n  \"countryCode\": \"PE\",\n  \"taxId\": \"POSTMAN-RUC-001\",\n  \"contactEmail\": \"{{exporterEmail}}\",\n  \"phone\": \"+51999999999\",\n  \"description\": \"Empresa ficticia para pruebas Postman.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

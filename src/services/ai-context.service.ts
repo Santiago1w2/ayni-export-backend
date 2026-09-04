@@ -127,7 +127,7 @@ export interface AIApplicationContext {
   offer?: Record<string, unknown>;
   importer?: Record<string, unknown>;
   buyingInterest?: Record<string, unknown>;
-  match?: { score: number; feedback?: Prisma.JsonValue | { reasons: string[] } };
+  match?: { score: number; feedback?: Prisma.JsonValue | { reasons: string[] }; breakdown?: Record<string, number>; missingRequirements?: string[] };
   requirementForm?: Record<string, unknown>;
   request?: Record<string, unknown>;
   documents?: Record<string, unknown>[];
@@ -215,16 +215,13 @@ async function contextFromOffer(
     : null;
   if (importerCompanyId && !importer) throw new AppError("importer not found", 404);
 
-  const interest = importerCompanyId
-    ? await prisma.buyingInterest.findFirst({
-        where: {
-          importerCompanyId,
-          active: true,
-          ...(offer ? { productName: { equals: offer.productName, mode: "insensitive" } } : {}),
-        },
-        orderBy: { updatedAt: "desc" },
-      })
-    : null;
+  const interests = importerCompanyId
+    ? await prisma.buyingInterest.findMany({ where: { importerCompanyId, active: true }, orderBy: { updatedAt: "desc" } })
+    : [];
+  const rankedInterests = offer
+    ? interests.map(interest => ({ interest, match: calculateOfferInterestMatch(offer, interest) })).sort((left, right) => right.match.score - left.match.score)
+    : interests.map(interest => ({ interest, match: null }));
+  const interest = rankedInterests[0]?.interest ?? null;
 
   const context: AIApplicationContext = {};
   if (offer) {
@@ -236,8 +233,8 @@ async function contextFromOffer(
   if (interest) {
     context.buyingInterest = interest;
     if (offer) {
-      const deterministicMatch = calculateOfferInterestMatch(offer, interest);
-      context.match = { score: deterministicMatch.score, feedback: { reasons: deterministicMatch.reasons } };
+      const deterministicMatch = rankedInterests[0].match!;
+      context.match = { score: deterministicMatch.score, feedback: { reasons: deterministicMatch.reasons }, breakdown: deterministicMatch.breakdown, missingRequirements: deterministicMatch.missingRequirements };
     }
   }
   return context;

@@ -15,11 +15,13 @@ Use that context before asking the user for information.
 
 Never ask for product, quantity, price, certifications, importer, requirements or operation status if that information is already present in APPLICATION_CONTEXT.
 
-Do not invent database information.
+Do not invent database information. Use only the application data provided.
+
+Never invent buyers, prices, quantities, certifications, requirements or matching criteria. Do not present a general recommendation as if it were a buyer requirement.
 
 If a value is absent, say that it has not been registered.
 
-Matching scores, prices, quantities, trade values and statistics provided in APPLICATION_CONTEXT are deterministic application data. Do not recalculate or alter them.
+Matching scores, prices, quantities, trade values and statistics provided in APPLICATION_CONTEXT are deterministic application data. Do not recalculate or alter them. Explain compatibility from the provided deterministic breakdown, reasons and missing requirements. If missingRequirements is empty, state that no deterministic matching requirement is missing.
 
 Document analysis is preliminary guidance, not legal/customs approval.
 
@@ -134,7 +136,10 @@ function contextualFallback(message: string, context: AIApplicationContext): str
       ? ` El comprador busca entre ${interest.minTargetPrice ?? "un minimo no registrado"} y ${interest.maxTargetPrice ?? "un maximo no registrado"} ${interest.currency ?? ""} por kg.`
       : " No hay un interes de compra compatible registrado para comparar el precio.";
     const score = context.match ? ` El matching determinista es ${context.match.score}%.` : "";
-    return `Tu oferta actual de ${product} esta registrada a ${price}.${target}${score}`;
+    const missing = context.match?.missingRequirements?.length
+      ? ` Para mejorar la compatibilidad revisa: ${context.match.missingRequirements.join(", ")}.`
+      : context.match ? " No faltan requisitos dentro de los criterios deterministas evaluados." : "";
+    return `Tu oferta actual de ${product} esta registrada a ${price}.${target}${score}${missing}`;
   }
   if (offer) {
     return `Tu oferta actual es ${product}, ${offer.quantityTons ?? "cantidad no registrada"} toneladas a ${price}.${request?.status ? ` La operacion esta en estado ${request.status}.` : ""}`;
