@@ -9,6 +9,13 @@ datasource db {
 enum UserRole {
   EXPORTER
   IMPORTER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  BLOCKED
 }
 
 enum VerificationStatus {
@@ -66,8 +73,14 @@ model User {
   passwordHash    String
   role            UserRole
   isActive        Boolean                @default(true)
+  accountStatus   AccountStatus           @default(ACTIVE)
+  emailVerified   Boolean                 @default(false)
+  lastLoginAt     DateTime?
   company         Company?
   statusActions   RequestStatusHistory[]
+  emailVerifications EmailVerification[]
+  adminAuditLogs  AdminAuditLog[]
+  notifications  Notification[]
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 }
@@ -95,6 +108,8 @@ model Company {
   exportOffers       ExportOffer[]
   receivedRequests   ExportRequest[]         @relation("ImporterRequests")
   uploadedDocuments  DocumentSubmission[]
+  authoredReviews    Review[]                @relation("ReviewAuthor")
+  receivedReviews    Review[]                @relation("ReviewTarget")
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
@@ -301,4 +316,61 @@ model Agreement {
   completedAt           DateTime?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
+  reviews               Review[]
+}
+
+model EmailVerification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  adminUserId String   @db.Uuid
+  adminUser   User     @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Review {
+  id              String    @id @default(uuid()) @db.Uuid
+  agreementId     String    @db.Uuid
+  agreement       Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  authorCompanyId String    @db.Uuid
+  authorCompany   Company   @relation("ReviewAuthor", fields: [authorCompanyId], references: [id], onDelete: Cascade)
+  targetCompanyId String    @db.Uuid
+  targetCompany   Company   @relation("ReviewTarget", fields: [targetCompanyId], references: [id], onDelete: Cascade)
+  rating          Int
+  comment         String?
+  createdAt       DateTime  @default(now())
+
+  @@unique([agreementId, authorCompanyId])
+  @@index([targetCompanyId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
 }

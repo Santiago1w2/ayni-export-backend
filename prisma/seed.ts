@@ -8,7 +8,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: proc
 let passwordHash = "";
 
 async function userCompany(email: string, role: UserRole, legalName: string, countryCode: string, taxId: string) {
-  const user = await prisma.user.upsert({ where: { email }, update: {}, create: { email, passwordHash, role } });
+  const user = await prisma.user.upsert({ where: { email }, update: { emailVerified: true }, create: { email, passwordHash, role, emailVerified: true } });
   return prisma.company.upsert({
     where: { ownerUserId: user.id },
     update: {},
@@ -18,6 +18,7 @@ async function userCompany(email: string, role: UserRole, legalName: string, cou
 
 async function main() {
 passwordHash = await bcrypt.hash("Demo12345!", 12);
+if(process.env.SUPER_ADMIN_EMAIL&&process.env.SUPER_ADMIN_PASSWORD){const adminHash=await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD,12);await prisma.user.upsert({where:{email:process.env.SUPER_ADMIN_EMAIL.toLowerCase()},update:{role:UserRole.ADMIN,emailVerified:true},create:{email:process.env.SUPER_ADMIN_EMAIL.toLowerCase(),passwordHash:adminHash,role:UserRole.ADMIN,emailVerified:true}})}
 await userCompany("exporter.demo@ayni.local", UserRole.EXPORTER, "Agro Andino Demo SAC", "PE", "DEMO-RUC-0001");
 const demos = [
   ["germany", "Ayni Demo Foods Germany", "DE", "Palta Hass"],

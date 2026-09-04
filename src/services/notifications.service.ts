@@ -1,0 +1,4 @@
+import{prisma}from"../config/prisma";import{AppError}from"../utils/errors";
+export async function listNotifications(userId:string,page=1,limit=20){page=Math.max(1,page);limit=Math.min(100,Math.max(1,limit));const[items,total,unread]=await prisma.$transaction([prisma.notification.findMany({where:{userId},skip:(page-1)*limit,take:limit,orderBy:{createdAt:"desc"}}),prisma.notification.count({where:{userId}}),prisma.notification.count({where:{userId,read:false}})]);return{items,page,limit,total,unread}}
+export async function readNotification(userId:string,id:string){const item=await prisma.notification.findFirst({where:{id,userId}});if(!item)throw new AppError("notification not found",404);return prisma.notification.update({where:{id},data:{read:true}})}
+export async function readAll(userId:string){const result=await prisma.notification.updateMany({where:{userId,read:false},data:{read:true}});return{updated:result.count}}

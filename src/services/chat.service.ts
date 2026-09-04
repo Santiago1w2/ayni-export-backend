@@ -1,2 +1,9 @@
-import{prisma}from"../config/prisma";import{AppError}from"../utils/errors";import{askAI}from"./ai.service";import{myCompany}from"./companies.service";
-export async function contextualChat(userId:string,input:{message:string;offerId?:string;requestId?:string;importerId?:string}){const parts:string[]=[];if(input.offerId){const o=await prisma.exportOffer.findUnique({where:{id:input.offerId}});if(!o)throw new AppError("offer not found",404);parts.push(JSON.stringify({offer:o}))}if(input.importerId){const i=await prisma.company.findUnique({where:{id:input.importerId},select:{id:true,legalName:true,countryCode:true,verificationStatus:true,description:true,buyingInterests:{where:{active:true}}}});if(!i)throw new AppError("importer not found",404);parts.push(JSON.stringify({importer:i}))}if(input.requestId){const c=await myCompany(userId);const r=await prisma.exportRequest.findFirst({where:{id:input.requestId,OR:[{offer:{exporterCompanyId:c.id}},{importerCompanyId:c.id}]},include:{offer:true,importerCompany:{select:{id:true,legalName:true,countryCode:true,verificationStatus:true}},buyingInterest:true,documents:{include:{analysis:true}}}});if(!r)throw new AppError("request not found",404);parts.push(JSON.stringify({request:r}))}return askAI(input.message,parts.join("\n"))}
+import { ChatRequest, ChatResponse } from "../types/chat.types";
+import { buildAIContext } from "./ai-context.service";
+import { askAI } from "./ai.service";
+
+export async function contextualChat(input: ChatRequest): Promise<ChatResponse> {
+  const { applicationContext, summary } = await buildAIContext(input);
+  const response = await askAI(input.message, applicationContext);
+  return Object.keys(summary).length ? { ...response, context: summary } : response;
+}

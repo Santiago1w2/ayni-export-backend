@@ -3,7 +3,11 @@ import multer from "multer";
 import { Prisma } from "@prisma/client";
 
 export class AppError extends Error {
-  constructor(message: string, public readonly statusCode = 400) {
+  constructor(
+    message: string,
+    public readonly statusCode = 400,
+    public readonly details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "AppError";
   }
@@ -23,7 +27,7 @@ export function errorHandler(
   }
 
   if (error instanceof AppError) {
-    response.status(error.statusCode).json({ error: error.message });
+    response.status(error.statusCode).json({ error: error.message, ...error.details });
     return;
   }
 

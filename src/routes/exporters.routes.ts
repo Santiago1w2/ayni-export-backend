@@ -1,0 +1,1 @@
+import{Router}from"express";import{exporterDetail}from"../services/public-profiles.service";const r=Router();r.get("/:id",async(req,res,next)=>{try{res.json(await exporterDetail(String(req.params.id)))}catch(e){next(e)}});export default r;

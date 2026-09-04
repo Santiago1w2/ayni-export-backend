@@ -1,0 +1,1 @@
+import{Router}from"express";import{all,list,read}from"../controllers/notifications.controller";import{requireAuth}from"../middleware/auth.middleware";const r=Router();r.use(requireAuth);r.get("/",list);r.post("/read-all",all);r.post("/:id/read",read);export default r;

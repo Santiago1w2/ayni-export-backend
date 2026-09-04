@@ -95,10 +95,60 @@ Gemini se usa en chatbot y análisis preliminar directo de PDF con structured ou
 
 Con las tres variables `SUPABASE_*`, `storage.service.ts` usa un bucket privado y guarda solo paths/metadatos en PostgreSQL. Sin ellas usa `uploads/` local. La service-role key permanece exclusivamente en backend.
 
-## Postman
+## Postman - Full MVP Testing
 
-Importa `postman/Ayni-Exports.postman_collection.json`. Configura `baseUrl`, ejecuta Login para guardar automáticamente `token` y completa los IDs generados por cada request. Los uploads dejan el campo File vacío para selección manual. Para PDFs usa **Send and Download**. Collection Runner permite ejecutar la secuencia, aunque los archivos deben seleccionarse manualmente.
+1. Inicia el backend con `npm run dev`.
+2. Importa `postman/Ayni-Exports.postman_collection.json` en Postman.
+3. Confirma que `baseUrl` sea `http://localhost:3000`.
+4. Ejecuta los login de exportador e importador. Sus tests guardan automáticamente `exporterToken` e `importerToken`; el login administrativo guarda `adminToken`.
+5. Para verificar una cuenta nueva, copia desde Gmail el código de seis dígitos en `verificationCode` y ejecuta manualmente **Verify Email**. Postman no recibe ni conoce credenciales SMTP.
+6. En las requests documentales selecciona manualmente un PDF en `document`. La colección no contiene rutas locales. Activa `runFileUploads=true` para incluirlas en Collection Runner.
+7. Para guardar el acuerdo o la constancia usa **Send and Download**.
+8. Collection Runner puede encadenar los IDs de empresa, interés, formulario, campos, oferta, solicitud, acuerdo y notificación mediante variables de colección.
+9. Los pasos que requieren correo, archivos, estados previos o que son destructivos se omiten por defecto. Se habilitan con las variables `run*` indicadas en cada descripción.
+10. Para administración configura `adminEmail` y `adminPassword` solo en tu Postman local. La colección no incluye credenciales administrativas.
+
+Orden recomendado:
+
+`Health → Register/Login Exporter → Verify Email → Create Exporter Company → Register/Login Importer → Verify Email → Create Importer Company → Create Buying Interest → Create Requirement Form/Requirements → Create Export Offer → Matching → Create Export Request → Complete Responses/Documents → Opportunity Feedback → Submit → Importer Accepts → Contact → Start Negotiation → Create Agreement → Agreement PDF → Complete Agreement → Completion PDF → Review`.
+
+El seed incluye usuarios ficticios verificados para desarrollo: `exporter.demo@ayni.local` e `importer.germany@ayni.local`, ambos con la contraseña demo documentada `Demo12345!`. No uses estas credenciales fuera de desarrollo.
 
 ## Migrar a AWS RDS
 
 Prisma no depende del SDK de Supabase para consultas. Para migrar a RDS PostgreSQL, cambia `DATABASE_URL`/`DIRECT_URL`, configura SSL según RDS y ejecuta `npm run db:deploy`. Solo `storage.service.ts` requiere cambios si también sustituyes Supabase Storage.
+
+## Verificación de correo con Gmail
+
+Cada registro crea un código aleatorio de seis dígitos, almacena únicamente su hash y lo marca con expiración de 10 minutos. Hay un máximo de cinco intentos y cooldown de 60 segundos para reenvíos. Configura una contraseña de aplicación de Google:
+
+```env
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
+EMAIL_FROM_NAME=Ayni Exports
+```
+
+Si Gmail no esta configurado o el servidor no puede conectarse a SMTP, el registro devuelve `emailSent: false`. La cuenta se conserva para que el usuario pueda iniciar sesion y reintentar con `POST /api/auth/resend-verification`; el reenvio devuelve HTTP 503 si Gmail sigue inaccesible. Los codigos que no pudieron enviarse se eliminan y no activan el cooldown. Un usuario sin correo verificado puede iniciar sesion, consultar `/api/auth/me`, verificar y reenviar; las operaciones comerciales permanecen bloqueadas.
+
+## Administración y moderación
+
+`UserRole` admite `EXPORTER`, `IMPORTER` y `ADMIN`. Todos usan el mismo login. Para crear idempotentemente el primer administrador mediante el seed configura:
+
+```env
+SUPER_ADMIN_EMAIL=
+SUPER_ADMIN_PASSWORD=
+```
+
+No se incluyen credenciales admin por defecto. Las cuentas pueden estar `ACTIVE`, `SUSPENDED` o `BLOCKED`. Los administradores consultan estadísticas reales, usuarios y empresas; verifican o rechazan empresas y moderan cuentas. Cada acción queda en `AdminAuditLog`. El badge de marketplace depende exclusivamente de `Company.verificationStatus`, no de la verificación del correo.
+
+## Dashboards, reseñas y notificaciones
+
+- `GET /api/dashboard/exporter`: operaciones, valores, matching, productos, destinos y actividad del exportador autenticado.
+- `GET /api/dashboard/importer`: solicitudes, aceptación, importaciones, productos, orígenes y rating del importador autenticado.
+- `GET /api/admin/stats`: estadísticas globales calculadas con Prisma.
+- `POST /api/agreements/:id/reviews`: reseña de 1 a 5, solo después de completar la operación y una vez por empresa/acuerdo.
+- `GET /api/companies/:id/reviews`: rating y reseñas públicas paginadas.
+- `GET /api/exporters/:id`: perfil público seguro del exportador.
+- `/api/notifications`: listado, marcar una y marcar todas como leídas.
+
+Los perfiles del marketplace incluyen rating, total de reseñas, intereses resumidos y operaciones completadas sin exponer datos privados.
